@@ -1,0 +1,202 @@
+services:
+  user-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: users_db
+      MYSQL_USER: rent
+      MYSQL_PASSWORD: rent_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - user-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-urent", "-prent_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  book-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: books_db
+      MYSQL_USER: rent
+      MYSQL_PASSWORD: rent_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - book-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-urent", "-prent_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  borrowing-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: borrowings_db
+      MYSQL_USER: rent
+      MYSQL_PASSWORD: rent_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - borrowing-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-urent", "-prent_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: User Service
+      APP_ENV: local
+      APP_KEY: base64:vbArfjCWbXo1xJVTaSIhn/QibHf0AW4MkT6U8BK3trQ=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8001
+      APP_PORT: 8001
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mysql
+      DB_HOST: user-db
+      DB_PORT: 3306
+      DB_DATABASE: users_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      JWT_ALGO: RS256
+      JWT_PUBLIC_KEY: file:///var/www/html/storage/keys/jwt_public.pem
+      JWT_PRIVATE_KEY: file:///var/www/html/storage/keys/jwt_private.pem
+      JWT_PASSPHRASE: ""
+      JWT_DEFAULT_ROLE: admin
+      PEMINJAMAN_SERVICE_URL: http://borrowing-service:8003
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    ports:
+      - "8001:8001"
+    depends_on:
+      user-db:
+        condition: service_healthy
+
+  book-service:
+    build:
+      context: ./book-service
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: Book Service
+      APP_ENV: local
+      APP_KEY: base64:nYP5umwt/awJeDevSp4k3W4mL8m+/9Lv614dS4n+w5U=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8002
+      APP_PORT: 8002
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mysql
+      DB_HOST: book-db
+      DB_PORT: 3306
+      DB_DATABASE: books_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+      USER_SERVICE_PUBLIC_KEY_PATH: /run/secrets/jwt_public.pem
+      L5_SWAGGER_CONST_HOST: http://localhost:8002
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./user-service/storage/keys/jwt_public.pem:/run/secrets/jwt_public.pem:ro
+    depends_on:
+      book-db:
+        condition: service_healthy
+
+  borrowing-service:
+    build:
+      context: ./servisPeminjaman
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: Borrowing Service
+      APP_ENV: local
+      APP_KEY: base64:3J5OnBHr1I8rReGMNnk4mmitLM1jdMp5RIAApt6gecE=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8003
+      APP_PORT: 8003
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mysql
+      DB_HOST: borrowing-db
+      DB_PORT: 3306
+      DB_DATABASE: borrowings_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: database
+      USER_SERVICE_URL: http://user-service:8001
+      BOOK_SERVICE_URL: http://book-service:8002
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    ports:
+      - "8003:8003"
+    depends_on:
+      borrowing-db:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      book-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+  borrowing-worker:
+    build:
+      context: ./servisPeminjaman
+      dockerfile: Dockerfile
+    command: >
+      sh -c "until php artisan migrate:status --no-interaction >/dev/null 2>&1;
+      do sleep 2;
+      done;
+      php artisan queue:work database --queue=default --sleep=3 --tries=3 --timeout=60"
+    environment:
+      APP_NAME: Borrowing Service Worker
+      APP_ENV: local
+      APP_KEY: base64:3J5OnBHr1I8rReGMNnk4mmitLM1jdMp5RIAApt6gecE=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8003
+      APP_PORT: 8003
+      LOG_CHANNEL: stderr
+      RUN_MIGRATIONS: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: borrowing-db
+      DB_PORT: 3306
+      DB_DATABASE: borrowings_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: database
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    depends_on:
+      borrowing-db:
+        condition: service_healthy
+      borrowing-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+  notification-service:
+    build:
+      context: ./servisNotifikasi
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: Notification Service
+      APP_ENV: local
+      APP_PORT: 8004
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    ports:
+      - "8004:8004"
+
+volumes:
+  user-db-data:
+  book-db-data:
+  borrowing-db-data:
