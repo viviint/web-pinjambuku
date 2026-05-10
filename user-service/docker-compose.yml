@@ -1,0 +1,52 @@
+services:
+  user-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: users_db
+      MYSQL_USER: rent
+      MYSQL_PASSWORD: rent_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - user-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-urent", "-prent_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: User Service
+      APP_ENV: local
+      APP_KEY: base64:vbArfjCWbXo1xJVTaSIhn/QibHf0AW4MkT6U8BK3trQ=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8001
+      APP_PORT: 8001
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mysql
+      DB_HOST: user-db
+      DB_PORT: 3306
+      DB_DATABASE: users_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      JWT_ALGO: RS256
+      JWT_PUBLIC_KEY: file:///var/www/html/storage/keys/jwt_public.pem
+      JWT_PRIVATE_KEY: file:///var/www/html/storage/keys/jwt_private.pem
+      JWT_PASSPHRASE: ""
+      JWT_DEFAULT_ROLE: admin
+      PEMINJAMAN_SERVICE_URL: http://host.docker.internal:8003
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    ports:
+      - "8001:8001"
+    depends_on:
+      user-db:
+        condition: service_healthy
+
+volumes:
+  user-db-data:
