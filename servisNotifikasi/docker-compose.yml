@@ -1,0 +1,12 @@
+services:
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: Notification Service
+      APP_ENV: local
+      APP_PORT: 8004
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    ports:
+      - "8004:8004"
