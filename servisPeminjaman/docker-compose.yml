@@ -1,0 +1,84 @@
+services:
+  borrowing-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: borrowings_db
+      MYSQL_USER: rent
+      MYSQL_PASSWORD: rent_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - borrowing-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-urent", "-prent_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  borrowing-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: Borrowing Service
+      APP_ENV: local
+      APP_KEY: base64:3J5OnBHr1I8rReGMNnk4mmitLM1jdMp5RIAApt6gecE=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8003
+      APP_PORT: 8003
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mysql
+      DB_HOST: borrowing-db
+      DB_PORT: 3306
+      DB_DATABASE: borrowings_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: database
+      USER_SERVICE_URL: http://host.docker.internal:8001
+      BOOK_SERVICE_URL: http://host.docker.internal:8002
+      NOTIFICATION_SERVICE_URL: http://host.docker.internal:8004
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    ports:
+      - "8003:8003"
+    depends_on:
+      borrowing-db:
+        condition: service_healthy
+
+  borrowing-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "until php artisan migrate:status --no-interaction >/dev/null 2>&1;
+      do sleep 2;
+      done;
+      php artisan queue:work database --queue=default --sleep=3 --tries=3 --timeout=60"
+    environment:
+      APP_NAME: Borrowing Service Worker
+      APP_ENV: local
+      APP_KEY: base64:3J5OnBHr1I8rReGMNnk4mmitLM1jdMp5RIAApt6gecE=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8003
+      APP_PORT: 8003
+      LOG_CHANNEL: stderr
+      RUN_MIGRATIONS: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: borrowing-db
+      DB_PORT: 3306
+      DB_DATABASE: borrowings_db
+      DB_USERNAME: rent
+      DB_PASSWORD: rent_password
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: database
+      NOTIFICATION_SERVICE_URL: http://host.docker.internal:8004
+      SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+    depends_on:
+      borrowing-db:
+        condition: service_healthy
+      borrowing-service:
+        condition: service_started
+
+volumes:
+  borrowing-db-data:
