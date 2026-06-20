@@ -43,6 +43,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  
+  notification-db:
+  image: mysql:8.0
+  environment:
+    MYSQL_ROOT_PASSWORD: rootpassword
+    MYSQL_DATABASE: notification_db
+    MYSQL_USER: notification_user
+    MYSQL_PASSWORD: notification_password
+  volumes:
+    - notification-db-data:/var/lib/mysql
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+    timeout: 20s
+    retries: 10
 
   user-service:
     build:
@@ -193,8 +207,16 @@ services:
       APP_ENV: local
       APP_PORT: 8004
       SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
+      DB_HOST: notification-db
+      DB_PORT: 3306
+      DB_DATABASE: notification_db
+      DB_USERNAME: notification_user
+      DB_PASSWORD: notification_password
     ports:
       - "8004:8004"
+    depends_on:
+      notification-db:
+        condition: service_healthy
 
   hasura-metadata-db:
     image: postgres:15
@@ -235,4 +257,5 @@ volumes:
   user-db-data:
   book-db-data:
   borrowing-db-data:
+  notification-db-data:
   hasura-metadata-data:
