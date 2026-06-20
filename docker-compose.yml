@@ -196,7 +196,43 @@ services:
     ports:
       - "8004:8004"
 
+  hasura-metadata-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root_password
+      POSTGRES_DB: hasura_metadata
+    volumes:
+      - hasura-metadata-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  graphql-engine:
+    image: hasura/graphql-engine:v2.33.0
+    ports:
+      - "8080:8080"
+    environment:
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:root_password@hasura-metadata-db:5432/hasura_metadata
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      HASURA_GRAPHQL_ADMIN_SECRET: rahasia123
+    depends_on:
+      hasura-metadata-db:
+        condition: service_healthy
+      borrowing-db:
+        condition: service_healthy
+  mysql-data-connector:
+    image: hasura/graphql-data-connector:v2.33.0
+    ports:
+      - "8081:8081"
+    depends_on:
+      - borrowing-db
+
 volumes:
   user-db-data:
   book-db-data:
   borrowing-db-data:
+  hasura-metadata-data:
