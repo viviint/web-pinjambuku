@@ -144,7 +144,9 @@ services:
       DB_PASSWORD: rent_password
       CACHE_DRIVER: file
       SESSION_DRIVER: file
-      QUEUE_CONNECTION: database
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis-broker
+      REDIS_CLIENT: predis
       USER_SERVICE_URL: http://user-service:8001
       BOOK_SERVICE_URL: http://book-service:8002
       NOTIFICATION_SERVICE_URL: http://notification-service:8004
@@ -160,6 +162,8 @@ services:
         condition: service_started
       notification-service:
         condition: service_started
+      redis-broker:
+        condition: service_started
 
   borrowing-worker:
     build:
@@ -169,7 +173,7 @@ services:
       sh -c "until php artisan migrate:status --no-interaction >/dev/null 2>&1;
       do sleep 2;
       done;
-      php artisan queue:work database --queue=default --sleep=3 --tries=3 --timeout=60"
+      php artisan queue:work redis --queue=default --sleep=3 --tries=3 --timeout=60"
     environment:
       APP_NAME: Borrowing Service Worker
       APP_ENV: local
@@ -187,7 +191,9 @@ services:
       DB_PASSWORD: rent_password
       CACHE_DRIVER: file
       SESSION_DRIVER: file
-      QUEUE_CONNECTION: database
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis-broker
+      REDIS_CLIENT: predis
       NOTIFICATION_SERVICE_URL: http://notification-service:8004
       SERVICE_KEY: 2f3b9986e5cd631b726f80faa1ccbb8c8f404132a42fb41dc36ad9a45a1290a4
     depends_on:
@@ -196,6 +202,8 @@ services:
       borrowing-service:
         condition: service_started
       notification-service:
+        condition: service_started
+      redis-broker:
         condition: service_started
 
   notification-service:
@@ -252,6 +260,11 @@ services:
       - "8081:8081"
     depends_on:
       - borrowing-db
+
+  redis-broker:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   user-db-data:
