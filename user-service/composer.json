@@ -11,6 +11,8 @@
         "laravel/framework": "^10.0",
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
+        "mll-lab/laravel-graphql-playground": "^1.1",
+        "nuwave/lighthouse": "^6.67",
         "php-open-source-saver/jwt-auth": "^2.3"
     },
     "require-dev": {
