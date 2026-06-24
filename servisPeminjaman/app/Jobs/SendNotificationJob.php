@@ -26,14 +26,21 @@ class SendNotificationJob implements ShouldQueue
     public function handle(): void
     {
         $notificationServiceUrl = env('NOTIFICATION_SERVICE_URL');
+        $serviceKey = env('SERVICE_KEY');
+
+        \Illuminate\Support\Facades\Log::info("Mencoba mengirim notif ke: " . $notificationServiceUrl);
 
         if (empty($notificationServiceUrl)) {
-            return;
+            throw new \Exception('CRITICAL ERROR: NOTIFICATION_SERVICE_URL kosong! Worker gagal membaca .env');
         }
 
-        Http::withHeaders(['X-Service-Key' => env('SERVICE_KEY')])
+        $endpoint = "{$notificationServiceUrl}/api/notifications/send";
+        
+        \Illuminate\Support\Facades\Log::info("Menembak URL: " . $endpoint);
+
+        \Illuminate\Support\Facades\Http::withHeaders(['X-Service-Key' => $serviceKey])
             ->timeout(5)
-            ->post("{$notificationServiceUrl}/api/notifications/send", [
+            ->post($endpoint, [
                 'id_anggota' => $this->idAnggota,
                 'pesan' => $this->pesan,
             ])

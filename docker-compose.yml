@@ -169,11 +169,7 @@ services:
     build:
       context: ./servisPeminjaman
       dockerfile: Dockerfile
-    command: >
-      sh -c "until php artisan migrate:status --no-interaction >/dev/null 2>&1;
-      do sleep 2;
-      done;
-      php artisan queue:work redis --queue=default --sleep=3 --tries=3 --timeout=60"
+    command: php artisan queue:work redis --queue=default --sleep=3 --tries=3 --timeout=60
     environment:
       APP_NAME: Borrowing Service Worker
       APP_ENV: local
